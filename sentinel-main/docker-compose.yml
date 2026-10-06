@@ -1,0 +1,66 @@
+services:
+  sentinel_web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sentinel_web
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      FLASK_HOST: 0.0.0.0
+      FLASK_PORT: 5000
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:?Define FLASK_SECRET_KEY in .env}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Define ADMIN_PASSWORD in .env}
+      ARDUINO_PORT: ${DOCKER_ARDUINO_PORT:-/dev/ttyUSB0}
+      CAMERA_INDEX: ${CAMERA_INDEX:-1}
+    depends_on:
+      mosquitto_sentinel:
+        condition: service_started
+    networks:
+      - sentinel_network
+    security_opt:
+      - no-new-privileges:true
+
+  mosquitto_sentinel:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto_sentinel
+    restart: unless-stopped
+    ports:
+      - "8883:8883"
+    volumes:
+      - ./config:/mosquitto/config:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_logs:/mosquitto/log
+    networks:
+      sentinel_network:
+        ipv4_address: 192.168.10.10
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          memory: 64M
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  sentinel_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.10.0/24
+          gateway: 192.168.10.1
+
+volumes:
+  mosquitto_data:
+    name: sentinel_mosquitto_data
+  mosquitto_logs:
+    name: sentinel_mosquitto_logs

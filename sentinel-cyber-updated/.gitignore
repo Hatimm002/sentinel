@@ -1,0 +1,5 @@
+﻿config/certs/*.key
+config/passwords
+mosquitto_data/
+mosquitto_logs/
+.env

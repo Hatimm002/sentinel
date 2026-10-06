@@ -2,3 +2,8 @@
 __pycache__/
 *.pkl
 .ipynb_checkpoints/
+.env
+*.key
+config/passwords
+sentinel-main/config/passwords
+sentinel-main/config/certs/*.key
