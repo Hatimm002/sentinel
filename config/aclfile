@@ -1,0 +1,8 @@
+# 1. Droits restreints pour le capteur IoT (Écriture seule)
+user sensor_temp
+topic write sentinel/sensors/temperature
+topic write sentinel/sensors/motion
+
+# 2. Droits complets pour le compte administrateur / API
+user sentinel_user
+topic readwrite sentinel/#
