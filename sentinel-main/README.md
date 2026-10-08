@@ -170,8 +170,9 @@ Cela signifie :
 - retour à l'état terminé après environ 1 seconde LOW ;
 - séparation minimale de 3 secondes entre deux alertes PIR.
 
-Le mouvement ne déclenche plus le buzzer et ne déclenche plus l'animation rouge
-du site. Il est conservé comme information dans l'interface.
+Le mouvement déclenche maintenant un bip court lorsque le PIR confirme une
+présence pendant environ 300 ms. Il ne déclenche toujours pas l'animation rouge
+du site : le mouvement reste visuellement informatif.
 
 L'ESP32 écrit :
 
@@ -191,8 +192,10 @@ Le PC peut envoyer :
 BUZZER_ALERT
 ```
 
-L'ESP32 lit cette commande et joue un bip de 180 ms à 1800 Hz. Un cooldown
-interne de 1 seconde évite les bips distants répétés en boucle.
+L'ESP32 lit cette commande et joue un bip de 180 ms à 1800 Hz. Le backend
+renvoie cette commande toutes les secondes tant que l'anomalie ou la personne
+détectée maintient l'état rouge du dashboard. Le cooldown interne de l'ESP32
+évite les bips distants répétés trop rapidement.
 
 ---
 
@@ -313,10 +316,13 @@ Optimisations utilisées :
 
 - résolution cible `640x480` ;
 - buffer caméra réduit à 1 image ;
-- YOLO exécuté une image sur trois ;
 - taille d'image YOLO `320` ;
 - JPEG qualité `75` ;
 - flux MJPEG avec attente de 50 ms entre les images.
+- La capture et l'encodage vidéo tournent indépendamment de l'inférence YOLO :
+  une inférence lente ne bloque donc plus l'affichage de la caméra.
+- YOLO analyse au maximum environ cinq images par seconde en prenant la trame
+  la plus récente disponible, afin d'éviter l'accumulation de retard.
 
 La détection est limitée à la classe COCO `0`, correspondant à `person`.
 
@@ -773,3 +779,34 @@ Les contrôles suivants ont été effectués pendant l'intégration :
 - reconnaissance de `MOUVEMENT_TERMINE` avec underscore validée.
 
 ---
+
+## 17. Historique, journal et arrêt distant
+
+Le dashboard conserve en mémoire les 180 dernières mesures reçues, soit environ
+six minutes avec une mesure toutes les deux secondes. L'endpoint authentifié
+`GET /api/history` expose l'heure, la température, l'humidité et le score
+Isolation Forest.
+
+Le graphique Chart.js affiche ces trois séries en direct. Les données sont
+volatiles et sont perdues au redémarrage de Flask ; aucune base de données
+n'est utilisée pour cet historique court.
+
+Le journal conserve les 50 derniers événements en mémoire via
+`GET /api/events-log`. Il enregistre notamment une anomalie Isolation Forest,
+une personne détectée par YOLO et une coupure distante du buzzer.
+
+Le bouton **Couper le buzzer** appelle :
+
+```text
+POST /api/buzzer/reset
+```
+
+Le serveur envoie `BUZZER_RESET` à l'ESP32. Le firmware exécute
+`noTone(BUZZER_PIN)` et répond `BUZZER_RESET_OK`. Cette commande nécessite que
+le port série soit connecté et que l'utilisateur soit authentifié.
+
+Une protection temporelle complémentaire surveille la saturation du DHT22 :
+si l'humidité reste à `99 %` ou plus pendant 10 secondes, elle est signalée
+comme anomalie et peut déclencher l'alerte. Cette règle ne remplace pas
+Isolation Forest ; elle évite qu'une valeur de saturation répétée, présente
+dans l'ancien CSV d'apprentissage, soit considérée normale indéfiniment.

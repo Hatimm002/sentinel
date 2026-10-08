@@ -45,6 +45,10 @@ void readRemoteCommands() {
   command.trim();
   if (command == "BUZZER_ALERT") {
     soundBuzzer(millis());
+  } else if (command == "BUZZER_RESET") {
+    noTone(BUZZER_PIN);
+    lastRemoteAlert = millis();
+    Serial.println("BUZZER_RESET_OK");
   }
 }
 
@@ -87,6 +91,7 @@ void detectMovement(unsigned long now) {
 
     if (enoughSamples && cooldownOver && !movementReported) {
       Serial.println("ALERTE : Mouvement detecte !");
+      soundBuzzer(now);
       lastMotionAlert = now;
       movementReported = true;
     }
